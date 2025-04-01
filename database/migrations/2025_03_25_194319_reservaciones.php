@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('reservaciones', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('id_user');
-            $table->foreign('id_user')->references('id')->on('users');
+            $table->foreign('id_user')->references('id')->on('usuarios');
             $table->unsignedBigInteger('id_espacio');
             $table->foreign('id_espacio')->references('id')->on('espacios');
             $table->date('fecha_reseva');
