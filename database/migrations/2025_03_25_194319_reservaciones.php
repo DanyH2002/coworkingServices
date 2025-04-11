@@ -21,7 +21,7 @@ return new class extends Migration
             $table->time('hora_inicio');
             $table->time('hora_fin');
             $table->enum('estado', ['pendiente', 'confirmada', 'cancelada']);
-            $table->double('total_precio');
+            $table->decimal('total_precio',12,2);
             $table->timestamps();
         });
     }

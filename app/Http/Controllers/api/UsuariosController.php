@@ -29,7 +29,7 @@ class UsuariosController extends Controller
         return response()->json([
             'status' => 1,
             'message' => 'Usuario registrado con éxito',
-            'usuario' => $usuario,
+            'usuario' => $usuario
         ], 201);
     }
     // Actualizar
@@ -78,6 +78,7 @@ class UsuariosController extends Controller
                     'message' => 'Usuario logueado con éxito',
                     'usuario' => $usuario,
                     'token' => $token,
+                    'rol' => $usuario->rol,
                 ], 200);
             } else {
                 return response()->json([

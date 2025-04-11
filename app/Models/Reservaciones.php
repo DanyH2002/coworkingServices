@@ -22,4 +22,13 @@ class Reservaciones extends Model
         'estado',
         'total_precio'
     ];
+
+    protected $casts = [
+        'estado' => 'string',
+        'total_precio' => 'decimal:2',
+    ];
+
+    protected $hidden = [
+        'updated_at',
+    ];
 }

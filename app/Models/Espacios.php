@@ -16,7 +16,15 @@ class Espacios extends Model
     protected $fillable = [
         'nombre',
         'capacidad',
-        'precio-hora',
+        'precio_hora',
         'disponibilidad'
+    ];
+
+    protected $casts = [
+        'disponibilidad' => 'boolean',
+    ];
+
+    protected $hidden = [
+        'updated_at',
     ];
 }

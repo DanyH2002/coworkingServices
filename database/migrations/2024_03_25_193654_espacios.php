@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('nombre')->unique();
             $table->integer('capacidad');
-            $table->double('precio-hora');
+            $table->decimal('precio_hora', 12, 2);
             $table->boolean('disponibilidad');
             $table->timestamps();
         });
