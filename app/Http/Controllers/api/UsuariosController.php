@@ -44,7 +44,7 @@ class UsuariosController extends Controller
         } else {
             $request->validate([
                 'name' => 'required|string',
-                'email' => 'required|string|email|unique:usuarios,email'.$id,
+                'email' => 'required|string|email|unique:usuarios,email' . $id,
                 'password' => 'nullable|string|min:8',
             ]);
             $usuario->name = $request->name;
@@ -76,7 +76,9 @@ class UsuariosController extends Controller
                 return response()->json([
                     'status' => 1,
                     'message' => 'Usuario logueado con éxito',
-                    'usuario' => $usuario,
+                    'id' => $usuario->id,
+                    'name' => $usuario->name,
+                    'email' => $usuario->email,
                     'token' => $token,
                     'rol' => $usuario->rol,
                 ], 200);

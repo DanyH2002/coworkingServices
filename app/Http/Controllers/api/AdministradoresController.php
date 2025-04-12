@@ -21,24 +21,6 @@ class AdministradoresController extends Controller
         ], 200);
     }
 
-    // Cambiar rol de usuario
-    public function changeRol(Request $id)
-    {
-        $usuario = Usuario::find($id->id);
-        if (!$usuario) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Usuario no encontrado',
-            ], 404);
-        }
-        $usuario->rol = $usuario->rol === 1 ? 0 : 1; // Cambiar rol
-        $usuario->save();
-        return response()->json([
-            'status' => 1,
-            'message' => 'Rol de usuario actualizado con éxito',
-            'usuario' => $usuario,
-        ], 200);
-    }
 
     // Crear un clinete y/o un administrador
     public function createUser(Request $request)
@@ -47,14 +29,14 @@ class AdministradoresController extends Controller
             'nombre' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:usuarios',
             'password' => 'required|string|min:8|confirmed',
-            'rol' => 'required|string|in:cliente,administrador',
+            'rol' => 'required|boolean', // 1 = administrador, 0 = cliente
         ]);
 
         $usuario = new Usuario();
         $usuario->nombre = $request->nombre;
         $usuario->email = $request->email;
-        $usuario->password = Hash::make($request->password);;
-        $usuario->rol = $request->rol === 'administrador' ? 1 : 0; // 1 = administrador, 0 = cliente
+        $usuario->password = Hash::make($request->password);
+        $usuario->rol = $request->rol;
         $usuario->save();
 
         return response()->json([
@@ -62,6 +44,40 @@ class AdministradoresController extends Controller
             'message' => 'Usuario creado con éxito',
             'usuario' => $usuario,
         ], 201);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $usuario = Usuario::find($id);
+        if (!$usuario) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'Usuario no encontrado',
+            ], 404);
+        }
+
+        $request->validate([
+            'nombre' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:usuarios,email,' . $id,
+            'password' => 'nullable|string|min:8|confirmed',
+            'rol' => 'required|boolean',
+        ]);
+
+        $usuario->nombre = $request->nombre;
+        $usuario->email = $request->email;
+        if ($request->password) {
+            $usuario->password = Hash::make($request->password);
+        }
+        // Si el rol es 1, se asigna el rol de administrador, si no, se asigna el rol de cliente
+        // 1 = administrador, 0 = cliente
+        $usuario->rol = $request->rol;
+        $usuario->save();
+
+        return response()->json([
+            'status' => 1,
+            'message' => 'Usuario actualizado con éxito',
+            'usuario' => $usuario,
+        ], 200);
     }
 
     public function dashboard()

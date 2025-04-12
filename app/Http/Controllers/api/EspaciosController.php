@@ -89,25 +89,6 @@ class EspaciosController extends Controller
         }
     }
 
-    // Desactivar/Activar espacio
-    public function status($id)
-    {
-        $espacio = Espacios::find($id);
-        if (!$espacio) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Espacio no encontrado',
-            ], 404);
-        }
-        $espacio->disponibilidad = $espacio->disponibilidad == 1 ? 0 : 1;
-        $espacio->save();
-        return response()->json([
-            'status' => 1,
-            'message' => 'Disponibilidad del espacio actualizado',
-            'espacio' => $espacio,
-        ], 200);
-    }
-
     // Obtener espacio por ID
     public function show($id)
     {

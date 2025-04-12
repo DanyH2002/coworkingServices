@@ -31,4 +31,13 @@ class Reservaciones extends Model
     protected $hidden = [
         'updated_at',
     ];
+    public function espacio()
+    {
+        return $this->belongsTo(Espacios::class, 'id_espacio');
+    }
+
+    public function usuario()
+    {
+        return $this->belongsTo(Usuario::class, 'id_user');
+    }
 }

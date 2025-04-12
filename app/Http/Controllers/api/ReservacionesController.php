@@ -9,6 +9,7 @@ use App\Models\Espacios;
 use App\Models\Usuario;
 use Illuminate\Support\Carbon as Carbon; //? Libreria para manejar fechas
 use App\Http\Controllers\api\FuncionesController as Email; //? Libreria para enviar correos
+use Illuminate\Support\Facades\Auth;
 
 class ReservacionesController extends Controller
 {
@@ -20,8 +21,7 @@ class ReservacionesController extends Controller
             'id_espacio' => 'required|integer',
             'fecha_reseva' => 'required|date',
             'hora_inicio' => 'required|date_format:H:i',
-            'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
-            'estado' => 'required|string|in:pendiente,confirmada,cancelada',
+            'hora_fin' => 'required|date_format:H:i|after:hora_inicio'
         ]);
 
         $usuario = Usuario::find($request->id_user);
@@ -42,6 +42,7 @@ class ReservacionesController extends Controller
 
         $time = Reservaciones::where('id_espacio', $request->id_espacio) // ? Verificar si el espacio ya está reservado
             ->where('fecha_reseva', $request->fecha_reseva)
+            ->where('estado', '!=', 'cancelada')
             ->where(function ($query) use ($request) {
                 $query->whereBetween('hora_inicio', [$request->hora_inicio, $request->hora_fin])
                     ->orWhereBetween('hora_fin', [$request->hora_inicio, $request->hora_fin]);
@@ -66,7 +67,10 @@ class ReservacionesController extends Controller
         $reservacion->fecha_reseva = $request->fecha_reseva;
         $reservacion->hora_inicio = $request->hora_inicio;
         $reservacion->hora_fin = $request->hora_fin;
-        $reservacion->estado = $request->estado;
+        //El estado se asigna como pendiente por defecto
+        // y se cambia a confirmada al pagar
+        // o a cancelada al cancelar
+        $reservacion->estado = 'pendiente';
         $reservacion->total_precio = $total_precio;
         $reservacion->save();
 
@@ -74,7 +78,7 @@ class ReservacionesController extends Controller
         Email::sendEmail( //? Enviar correo a los administradores y al cliente
             $emails,
             'Reservación creada',
-            "Tu reservación fue creada con éxito.\n\nDetalles:\nEspacio: {$estado->nombre}\nFecha: {$reservacion->fecha_reseva}\nHora: {$reservacion->hora_inicio} - {$reservacion->hora_fin}\nEstado: {$reservacion->estado} \nTotal: $ {$total_precio}"
+            "Tu reservación fue creada con éxito.\n\nDetalles:\nEspacio: {$estado->nombre}\nFecha: {$reservacion->fecha_reseva}\nHora: {$reservacion->hora_inicio} - {$reservacion->hora_fin}\nEstado: {$reservacion->estado} de pago \nTotal: $ {$total_precio}"
         );
 
         return response()->json([
@@ -85,14 +89,21 @@ class ReservacionesController extends Controller
     }
 
     // Cancelar reservación (propias para cliente, todas para admin)
-    public function cancel(Request $request)
+    public function cancel(Request $request, $id)
     {
-        $usuario = Usuario::find($request->id_user);
+        // Obtener el usuario autenticado
+        $usuario = Auth::user();
+        if (!$usuario) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'Usuario no autenticado',
+            ], 403);
+        }
         if ($usuario->rol === 1) {
-            $reservacion = Reservaciones::find($request->id_reservacion);
+            $reservacion = Reservaciones::find($id);
         } else {
-            $reservacion = Reservaciones::where('id_user', $request->id_user)
-                ->where('id', $request->id_reservacion)
+            $reservacion = Reservaciones::where('id_user', $usuario->id)
+                ->where('id', $id)
                 ->first();
         }
         if (!$reservacion) {
@@ -108,7 +119,7 @@ class ReservacionesController extends Controller
             Email::sendEmail(
                 $emails,
                 'Reservación cancelada',
-                "La reservación con ID {$reservacion->id} ha sido cancelada."
+                "La reservación con los siguientes detalles ha sido cancelada:\n\n ID de Reservación: {$reservacion->id}\n Espacio: {$reservacion->espacio->nombre}\n Fecha: {$reservacion->fecha_reseva}\n Hora: {$reservacion->hora_inicio} - {$reservacion->hora_fin}\n\n Estado: {$reservacion->estado}\n\n El espacio ahora está disponible para nuevas reservaciones."
             );
             return response()->json([
                 'status' => 1,
@@ -126,7 +137,7 @@ class ReservacionesController extends Controller
     // Listar reservaciones (Propias para cliente, todas para admin)
     public function list(Request $request)
     {
-        $usuario = Usuario::find($request->id_user);
+        $usuario = Usuario::find($request->query('id_user'));
         if (!$usuario) {
             return response()->json([
                 'status' => 0,
@@ -134,9 +145,11 @@ class ReservacionesController extends Controller
             ], 404);
         }
         if ($usuario->rol === 1) {
-            $reservaciones = Reservaciones::all();
+            $reservaciones = Reservaciones::with(['espacio', 'usuario'])->get();
         } else {
-            $reservaciones = Reservaciones::where('id_user', $request->id_user)->get();
+            $reservaciones = Reservaciones::with(['espacio', 'usuario'])
+                ->where('id_user', $request->query('id_user'))
+                ->get();
         }
         return response()->json([
             'status' => 1,
@@ -147,8 +160,8 @@ class ReservacionesController extends Controller
     // Pagar reservación (solo admin)
     public function pay(Request $request)
     {
-        $usuario = Usuario::find($request->id_user);
-        if (!$usuario || $usuario->rol !== 1) {
+        $usuario = Auth::user();
+        if (!$usuario || $usuario->rol !== 1) { // Verifica si el usuario es administrador
             return response()->json([
                 'status' => 0,
                 'message' => 'No tienes permisos para realizar esta acción',
@@ -203,5 +216,24 @@ class ReservacionesController extends Controller
         }
 
         return $administradores; // Si no hay cliente, solo devolver los administradores
+    }
+
+    // Obtener la reservación por id
+    public function show($id)
+    {
+        $reservacion = Reservaciones::find($id);
+        if (!$reservacion) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'Reservación no encontrada',
+            ], 404);
+        }
+        // Acceder a los datos relacionados
+        $espacio = $reservacion->espacio; // Obtener el espacio relacionado
+        $usuario = $reservacion->usuario; // Obtener el usuario relacionado
+        return response()->json([
+            'status' => 1,
+            'reservacion' => $reservacion,
+        ], 200);
     }
 }
