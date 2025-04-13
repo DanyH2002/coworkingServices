@@ -10,7 +10,6 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [UsuariosController::class, 'login']);
     Route::post('/register', [UsuariosController::class, 'register']);
     Route::post('/logout', [UsuariosController::class, 'logout'])->middleware('auth:sanctum');
-    Route::put('/update', [UsuariosController::class, 'update'])->middleware('auth:sanctum');
 });
 
 Route::prefix('espacios')->middleware('auth:sanctum')->group(function () {
@@ -31,7 +30,8 @@ Route::prefix('reservaciones')->middleware('auth:sanctum')->group(function () {
 
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('/usuarios', [AdministradoresController::class, 'listUsers']);
+    Route::get('users/{id}', [AdministradoresController::class, 'showUser'])->where('id', '[0-9]+');
     Route::get('', [AdministradoresController::class, 'dashboard']);
     Route::post('/usuarios', [AdministradoresController::class, 'createUser']);
-    Route::put('/usuarios/{id}', [AdministradoresController::class, 'updateUser'])->where('id', '[0-9]+');
+    Route::put('/usuarios/{id}', [AdministradoresController::class, 'update'])->where('id', '[0-9]+');
 });

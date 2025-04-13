@@ -32,35 +32,6 @@ class UsuariosController extends Controller
             'usuario' => $usuario
         ], 201);
     }
-    // Actualizar
-    public function update(Request $request, $id)
-    {
-        $usuario = Usuario::where('id', $id)->first();
-        if (!$usuario) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Usuario no encontrado',
-            ], 404);
-        } else {
-            $request->validate([
-                'name' => 'required|string',
-                'email' => 'required|string|email|unique:usuarios,email' . $id,
-                'password' => 'nullable|string|min:8',
-            ]);
-            $usuario->name = $request->name;
-            $usuario->email = $request->email;
-            if ($request->password) {
-                $usuario->password = Hash::make($request->password);
-            }
-            $usuario->save();
-
-            return response()->json([
-                'status' => 1,
-                'message' => 'Usuario actualizado con éxito',
-                'usuario' => $usuario,
-            ], 200);
-        }
-    }
 
     // Login
     public function login(Request $request)

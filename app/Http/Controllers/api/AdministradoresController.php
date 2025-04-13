@@ -8,6 +8,8 @@ use App\Models\Usuario;
 use App\Models\Espacios;
 use App\Models\Reservaciones;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon as Carbon;
 
 class AdministradoresController extends Controller
 {
@@ -26,14 +28,14 @@ class AdministradoresController extends Controller
     public function createUser(Request $request)
     {
         $request->validate([
-            'nombre' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:usuarios',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => 'required|string|min:8',
             'rol' => 'required|boolean', // 1 = administrador, 0 = cliente
         ]);
 
         $usuario = new Usuario();
-        $usuario->nombre = $request->nombre;
+        $usuario->name = $request->name;
         $usuario->email = $request->email;
         $usuario->password = Hash::make($request->password);
         $usuario->rol = $request->rol;
@@ -57,13 +59,13 @@ class AdministradoresController extends Controller
         }
 
         $request->validate([
-            'nombre' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:usuarios,email,' . $id,
-            'password' => 'nullable|string|min:8|confirmed',
+            'password' => 'nullable|string|min:8',
             'rol' => 'required|boolean',
         ]);
 
-        $usuario->nombre = $request->nombre;
+        $usuario->name = $request->name;
         $usuario->email = $request->email;
         if ($request->password) {
             $usuario->password = Hash::make($request->password);
@@ -76,6 +78,21 @@ class AdministradoresController extends Controller
         return response()->json([
             'status' => 1,
             'message' => 'Usuario actualizado con éxito',
+            'usuario' => $usuario,
+        ], 200);
+    }
+
+    public function showUser($id)
+    {
+        $usuario = Usuario::find($id);
+        if (!$usuario) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'Usuario no encontrado',
+            ], 404);
+        }
+        return response()->json([
+            'status' => 1,
             'usuario' => $usuario,
         ], 200);
     }
@@ -96,15 +113,22 @@ class AdministradoresController extends Controller
 
         // Ingresos del mes
         $ingresos = Reservaciones::whereMonth('fecha_reseva', now()->month)
+            ->where('estado', 'confirmada')
             ->whereYear('fecha_reseva', now()->year)
             ->sum('total_precio');
 
         // Porcentaje de reservaciones del mes
         $reservacionesMes = Reservaciones::whereMonth('fecha_reseva', now()->month)
+            ->where('estado', 'confirmada')
             ->whereYear('fecha_reseva', now()->year)
             ->count();
         $reservacionesTotales = Reservaciones::count();
         $porcentajeReservacionesMes = $reservacionesTotales > 0 ? ($reservacionesMes / $reservacionesTotales) * 100 : 0;
+
+        // Incluir las funciones de los ultimos 12 meses
+        $ingresosUltimos12Meses = $this->ingresosUltimos12Meses();
+        $reservacionesUltimos12Meses = $this->ReservacionesUltimos12Meses();
+        $registroUsuariosUltimos12Meses = $this->RegistroUsuariosUltimos12Meses();
 
         return response()->json([
             'status' => 1,
@@ -115,6 +139,9 @@ class AdministradoresController extends Controller
                 'espacios_existentes' => $espacios,
                 'ingresos_mes' => $ingresos,
                 'porcentaje_reservaciones_mes' => $porcentajeReservacionesMes,
+                'ingresos_ultimos_12_meses' => $ingresosUltimos12Meses,
+                'reservaciones_ultimos_12_meses' => $reservacionesUltimos12Meses,
+                'registro_usuarios_ultimos_12_meses' => $registroUsuariosUltimos12Meses,
             ],
         ], 200);
     }
@@ -122,24 +149,71 @@ class AdministradoresController extends Controller
     // Ingresos por mes (ultimos 12 meses)
     public function ingresosUltimos12Meses()
     {
-        $ingresosUltimos12Meses = [];
-        for ($i = 0; $i < 12; $i++) {
-            $mes = now()->subMonths($i)->format('m');
-            $anio = now()->subMonths($i)->format('Y');
-            $ingresos = Reservaciones::whereMonth('fecha_reseva', $mes)
-                ->whereYear('fecha_reseva', $anio)
-                ->sum('total_precio');
-            $ingresosUltimos12Meses[] = [
-                'mes' => now()->subMonths($i)->format('F'),
-                'ingresos' => $ingresos,
-            ];
-        }
+        $data = Reservaciones::select(
+            DB::raw('DATE_FORMAT(fecha_reseva, "%Y-%m") as mes'),
+            DB::raw('SUM(total_precio) as total')
+        )
+            ->where('estado', 'confirmada')
+            ->whereBetween('fecha_reseva', [now()->subMonths(11)->startOfMonth(), now()->endOfMonth()])
+            ->groupBy('mes')
+            ->orderBy('mes', 'asc')
+            ->get();
         return response()->json([
             'status' => 1,
-            'data' => $ingresosUltimos12Meses,
+            'data' => $this->formatMonthlyData($data),
         ], 200);
     }
     // Ingreso de reservaciones por mes (ultimos 12 meses)
+    public function ReservacionesUltimos12Meses() {
+        $data = Reservaciones::select(
+            DB::raw('DATE_FORMAT(fecha_reseva, "%Y-%m") as mes'),
+            DB::raw('COUNT(*) as total')
+        )
+            ->where('estado', 'confirmada')
+            ->whereBetween('fecha_reseva', [now()->subMonths(11)->startOfMonth(), now()->endOfMonth()])
+            ->groupBy('mes')
+            ->orderBy('mes', 'asc')
+            ->get();
+        return response()->json([
+            'status' => 1,
+            'data' => $this->formatMonthlyData($data),
+        ], 200);
+    }
     // Ingreso de registro de usuarios por mes (ultimos 12 meses)
+    public function RegistroUsuariosUltimos12Meses() {
+        $data = Usuario::select(
+            DB::raw('DATE_FORMAT(created_at, "%Y-%m") as mes'),
+            DB::raw('COUNT(*) as total')
+        )
+            ->whereBetween('created_at', [now()->subMonths(11)->startOfMonth(), now()->endOfMonth()])
+            ->groupBy('mes')
+            ->orderBy('mes', 'asc')
+            ->get();
+        return response()->json([
+            'status' => 1,
+            'data' => $this->formatMonthlyData($data),
+        ], 200);
+    }
+
+    // Función auxiliar para rellenar meses vacíos
+private function formatMonthlyData($data)
+{
+    $meses = [];
+    $actual = Carbon::now()->startOfMonth()->subMonths(11);
+    for ($i = 0; $i < 12; $i++) {
+        $label = $actual->format('Y-m');
+        $meses[$label] = 0;
+        $actual->addMonth();
+    }
+
+    foreach ($data as $item) {
+        $meses[$item->mes] = $item->total;
+    }
+
+    return [
+        'labels' => array_keys($meses),
+        'data' => array_values($meses),
+    ];
+    }
 
 }
