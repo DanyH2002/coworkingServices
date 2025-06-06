@@ -174,12 +174,6 @@ class ReservacionesController extends Controller
                 'message' => 'Reservación no encontrada',
             ], 404);
         }
-        if ($reservacion->estado !== 'pendiente') {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Solo se pueden pagar reservaciones pendientes.',
-            ], 400);
-        }
         $espacio = Espacios::find($reservacion->id_espacio);
         if (!$espacio) {
             return response()->json([
